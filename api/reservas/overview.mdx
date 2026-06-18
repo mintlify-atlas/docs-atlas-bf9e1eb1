@@ -1,7 +1,7 @@
 ---
-title: "Reservas API: Booking and Scheduling Endpoints"
+title: "Reservas API: Coworking Booking Endpoints Overview"
 sidebarTitle: "Overview"
-description: "The Reservas endpoints manage coworking space bookings. Create reservations with time windows, update their status, and list or delete existing bookings."
+description: "The Reservas API manages coworking bookings. Create reservations with time windows, update their status, and list, retrieve, or delete records."
 ---
 
 The Reservas API is the core scheduling surface of the CoworkingBooking platform. It lets clients create new bookings against a coworking space (`espacioId`) on behalf of a registered user (`usuarioId`), track each booking's lifecycle through its `estado` field, and clean up cancelled or expired records. Every reservation carries three distinct timestamps that together represent the user's window and the post-session cleaning buffer, all serialised in `yyyy-MM-dd HH:mm` format.
@@ -14,6 +14,7 @@ All Reservas endpoints are mounted under `/reserva` (singular).
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/reserva/ping` | Health check — returns the plain-text string `"pong"` |
 | `GET` | `/reserva/all` | List all reservations |
 | `GET` | `/reserva/{id}` | Retrieve a single reservation by ID |
 | `POST` | `/reserva/create` | Create a new reservation |
@@ -86,6 +87,9 @@ Every endpoint that returns reservation data uses the same shape.
 ## Endpoint pages
 
 <CardGroup cols={2}>
+  <Card title="GET /ping" icon="signal" href="/api/reservas/overview#endpoints">
+    Health check for the Reservas controller — returns `"pong"`.
+  </Card>
   <Card title="GET /all" icon="list" href="/api/reservas/get-all">
     Retrieve all reservations in the system as a JSON array.
   </Card>

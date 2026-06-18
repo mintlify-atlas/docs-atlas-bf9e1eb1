@@ -1,7 +1,7 @@
 ---
-title: "POST /usuarios/create — Register a New User"
-sidebarTitle: "POST /create"
-description: "Register a new user by providing nombre, email, password_hash, and rol. Email must be unique; a duplicate triggers a 400 error with type email-alredy-exist."
+title: "POST /usuarios/create — Register a New User Account"
+sidebarTitle: "Create User"
+description: "Register a new user with nombre, email, password_hash, and rol. Email must be unique; duplicates return a 400 with type email-alredy-exist."
 ---
 
 The `POST /usuarios/create` endpoint registers a new user account in the CoworkingBooking system. You must supply at minimum a `nombre` and a valid, unique `email`. Optionally include a `password_hash` value and a `rol` to control the user's access level. If the provided email is already associated with an existing account, the request is rejected with a `400 Bad Request` response before any data is written.

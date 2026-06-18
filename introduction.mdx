@@ -1,7 +1,7 @@
 ---
 title: "CoworkingBooking API: Space Reservation Service Overview"
 sidebarTitle: "Introduction"
-description: "CoworkingBooking is a Spring Boot REST API for managing coworking spaces, users, and bookings with PostgreSQL persistence and OpenAPI documentation."
+description: "CoworkingBooking is a Spring Boot 4 REST API for managing coworking spaces, users, and bookings with PostgreSQL persistence and full OpenAPI documentation."
 ---
 
 CoworkingBooking is a Spring Boot 4 REST API designed to manage the full lifecycle of coworking space reservations — from registering shared workspaces and meeting rooms to creating and tracking bookings for individual users. Built for educational and production-ready deployment scenarios alike, it provides a clean JSON interface over three core resources (`Espacio`, `Usuario`, `Reserva`), backed by a PostgreSQL database and fully documented via OpenAPI 3.
@@ -28,6 +28,29 @@ CoworkingBooking is a Spring Boot 4 REST API designed to manage the full lifecyc
     The embedded HikariCP pool is pre-configured with a maximum of 10 connections and schema pinning, ensuring efficient resource usage under concurrent load.
   </Card>
 </CardGroup>
+
+## API Endpoints
+
+The API exposes 16 public endpoints across the three resource groups:
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/espacios/all` | List all coworking spaces |
+| `GET` | `/espacios/{id}` | Retrieve a space by ID |
+| `POST` | `/espacios/create` | Create a new coworking space |
+| `DELETE` | `/espacios/eliminar/{id}` | Delete a space by ID |
+| `GET` | `/espacios/ping` | Health check — returns `"pong"` |
+| `GET` | `/reserva/all` | List all reservations |
+| `GET` | `/reserva/{id}` | Retrieve a reservation by ID |
+| `POST` | `/reserva/create` | Create a new reservation |
+| `PUT` | `/reserva/update/{id}` | Update a reservation's status |
+| `DELETE` | `/reserva/eliminar/{id}` | Delete a reservation by ID |
+| `GET` | `/reserva/ping` | Health check — returns `"pong"` |
+| `GET` | `/usuarios/all` | List all users |
+| `GET` | `/usuarios/{id}` | Retrieve a user by ID |
+| `POST` | `/usuarios/create` | Create a new user |
+| `DELETE` | `/usuarios/eliminar/{id}` | Delete a user by ID |
+| `GET` | `/usuarios/ping` | Health check — returns `"pong"` |
 
 ## Architecture Overview
 
@@ -84,3 +107,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
 ```
 
 Set `NEXT_PUBLIC_API_URL` in your `.env.local` file (Next.js dashboard) or as a deployment environment variable to point the frontend at a hosted API instance.
+
+## Health Check Endpoints
+
+Each resource group exposes a dedicated `GET /ping` endpoint that returns the plain string `"pong"`. Use these to confirm the server is up and routing requests correctly before running further tests:
+
+| Endpoint | Returns |
+|---|---|
+| `GET /espacios/ping` | `pong` |
+| `GET /reserva/ping` | `pong` |
+| `GET /usuarios/ping` | `pong` |
+
+```bash
+curl http://localhost:8080/espacios/ping   # → pong
+curl http://localhost:8080/reserva/ping    # → pong
+curl http://localhost:8080/usuarios/ping   # → pong
+```

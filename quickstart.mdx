@@ -1,7 +1,7 @@
 ---
 title: "Get Started with CoworkingBooking API in 5 Minutes"
 sidebarTitle: "Quickstart"
-description: "Learn how to run the CoworkingBooking API locally, create a user, register a space, and make your first booking in five steps."
+description: "Learn how to run the CoworkingBooking API locally, create a user, register a coworking space, and make your first booking in six guided steps."
 ---
 
 This guide walks you through standing up the CoworkingBooking API on your local machine and making your first three API calls — creating a user, registering a coworking space, and booking that space — from scratch.
@@ -75,11 +75,12 @@ This guide walks you through standing up the CoworkingBooking API on your local 
     Started CoworkingbookingApplication in 3.4 seconds (process running for 3.8)
     ```
 
-    The API is now listening at `http://localhost:8080`. Verify with the built-in ping endpoint:
+    The API is now listening at `http://localhost:8080`. Verify with the built-in ping endpoints — one per resource group — each returns the plain string `"pong"`:
 
     ```bash
-    curl http://localhost:8080/usuarios/ping
-    # → pong
+    curl http://localhost:8080/espacios/ping   # → pong
+    curl http://localhost:8080/reserva/ping    # → pong
+    curl http://localhost:8080/usuarios/ping   # → pong
     ```
   </Step>
 
@@ -172,6 +173,28 @@ This guide walks you through standing up the CoworkingBooking API on your local 
     ```
 
     The `version` field is managed by Hibernate for optimistic locking. The 15-minute gap between `horaFinUsuario` and `horaFinTotal` reflects the `minutos_limpieza` value set on the space.
+  </Step>
+
+  <Step title="Update a reservation's status">
+    Use the `PUT /reserva/update/{id}` endpoint to change the status of an existing reservation. Only the `id` and `estado` fields are required in the request body:
+
+    ```bash
+    curl -X PUT http://localhost:8080/reserva/update/1 \
+      -H "Content-Type: application/json" \
+      -d '{
+        "id": 1,
+        "estado": "cancelada"
+      }'
+    ```
+
+    **Sample response** (`200 OK`):
+
+    ```json
+    {
+      "id": 1,
+      "estado": "cancelada"
+    }
+    ```
   </Step>
 
 </Steps>

@@ -1,5 +1,5 @@
 ---
-title: "Usuarios API: User Registration and Management"
+title: "Usuarios API — Create, Retrieve, and Delete Users"
 sidebarTitle: "Overview"
 description: "The Usuarios endpoints manage user accounts for the coworking booking system. Create, retrieve, and delete users with role and email-based identity."
 ---
@@ -16,6 +16,7 @@ The **Usuarios** resource represents registered user accounts in the CoworkingBo
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/usuarios/ping` | Health check — returns the plain text string `"pong"` |
 | `GET` | `/usuarios/all` | Retrieve a list of all registered users |
 | `GET` | `/usuarios/{id}` | Fetch a single user by their integer ID |
 | `POST` | `/usuarios/create` | Register a new user account |
@@ -68,6 +69,9 @@ Every response that returns user data uses the following shape.
 ## Explore the endpoints
 
 <CardGroup cols={2}>
+  <Card title="GET /ping" icon="signal" href="/api/usuarios/overview#endpoints">
+    Health check that returns the plain text string `"pong"`.
+  </Card>
   <Card title="GET /all" icon="list" href="/api/usuarios/get-all">
     Retrieve a list of all registered users in the system.
   </Card>

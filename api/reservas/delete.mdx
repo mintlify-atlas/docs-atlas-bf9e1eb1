@@ -1,7 +1,7 @@
 ---
-title: "DELETE /reserva/eliminar/{id} — Cancel and Remove a Reservation"
-sidebarTitle: "DELETE /eliminar"
-description: "Delete a reservation by its integer ID. Returns a plain text success message. Throws a 500 error if the ID does not exist."
+title: "DELETE /reserva/eliminar/{id} — Remove a Reservation"
+sidebarTitle: "Delete Reservation"
+description: "Delete a reservation by its integer ID. Returns a plain-text success message. Throws a 500 error if the reservation ID does not exist in the database."
 ---
 
 The `DELETE /reserva/eliminar/{id}` endpoint permanently removes a reservation record from the database. The service first fetches the record to confirm it exists — using `orElseThrow` — and then calls `delete` on the repository. On success the response body is the plain-text string `"Reserva eliminada exitosamente"` with an HTTP `200 OK` status. This operation is irreversible; deleted reservations cannot be recovered through the API.

@@ -1,6 +1,6 @@
 ---
 title: "PUT /reserva/update/{id} — Update Reservation Status"
-sidebarTitle: "PUT /update"
+sidebarTitle: "Update Status"
 description: "Update the status of an existing reservation. Only the estado field can be changed. Returns the full updated Reserva object with an incremented version."
 ---
 
@@ -15,7 +15,7 @@ The `PUT /reserva/update/{id}` endpoint is a deliberately scoped mutation: it ch
 ## Request body
 
 <ParamField body="id" type="integer">
-  The reservation ID. This mirrors the path parameter and is carried in the `UpdateReservaRequest` DTO. Both must reference the same reservation.
+  The reservation ID as carried in the `UpdateReservaRequest` DTO. The service resolves the target record using the path parameter `{id}`, not this field — but including it keeps the DTO consistent. Both values should reference the same reservation.
 </ParamField>
 
 <ParamField body="estado" type="string" required>
