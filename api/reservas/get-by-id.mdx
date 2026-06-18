@@ -1,0 +1,75 @@
+---
+title: "GET /reserva/{id} — Retrieve a Reservation by ID"
+sidebarTitle: "GET /{id}"
+description: "Fetch a single reservation by its integer ID. Returns the full Reserva object including timestamps, status, user ID, space ID, and version."
+---
+
+The `GET /reserva/{id}` endpoint looks up a single reservation by its primary key and returns the complete `Reserva` object. Use this endpoint when you need detailed information about one specific booking rather than scanning the full list. The service layer calls `orElseThrow` internally, so supplying an ID that does not exist in the database will result in a `500` error rather than a `404`.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the reservation to retrieve. Must correspond to an existing record in the `reservas` table.
+</ParamField>
+
+## Request
+
+```bash
+curl -X GET http://localhost:8080/reserva/7 \
+  -H "Accept: application/json"
+```
+
+## Response
+
+Returns `200 OK` with a single `Reserva` object.
+
+```json
+{
+  "id": 7,
+  "usuarioId": 3,
+  "espacioId": 2,
+  "horaInicio": "2025-06-10 09:00",
+  "horaFinUsuario": "2025-06-10 11:00",
+  "horaFinTotal": "2025-06-10 11:30",
+  "estado": "confirmada",
+  "version": 1
+}
+```
+
+## Response fields
+
+<ResponseField name="id" type="integer">
+  Unique auto-generated identifier for the reservation.
+</ResponseField>
+
+<ResponseField name="usuarioId" type="integer">
+  ID of the user who made the booking.
+</ResponseField>
+
+<ResponseField name="espacioId" type="integer">
+  ID of the coworking space that was reserved.
+</ResponseField>
+
+<ResponseField name="horaInicio" type="string">
+  Start time of the reservation in `yyyy-MM-dd HH:mm` format.
+</ResponseField>
+
+<ResponseField name="horaFinUsuario" type="string">
+  The time the user's session ends, in `yyyy-MM-dd HH:mm` format.
+</ResponseField>
+
+<ResponseField name="horaFinTotal" type="string">
+  Absolute end of the reserved slot including the post-session cleaning buffer, in `yyyy-MM-dd HH:mm` format.
+</ResponseField>
+
+<ResponseField name="estado" type="string">
+  Current status of the reservation. One of `confirmada`, `pendiente`, or `cancelada`.
+</ResponseField>
+
+<ResponseField name="version" type="integer">
+  Optimistic-locking version counter managed by JPA's `@Version` annotation.
+</ResponseField>
+
+<Warning>
+  If no reservation with the supplied `id` exists, the service throws a `RuntimeException` ("Reserva no encontrada con ID: {id}"), which Spring Boot surfaces as an HTTP `500 Internal Server Error`. Validate that the ID exists (e.g. via `GET /reserva/all`) before calling this endpoint if you want to avoid unhandled errors on the client side.
+</Warning>

@@ -1,28 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "CoworkingBooking API",
+  "projectType": "api-service",
+  "projectName": "CoworkingBooking API",
+  "projectDescription": "A Spring Boot REST API for managing coworking space reservations, including users, spaces, and bookings.",
   "theme": "luma",
-  "colors": {
-    "primary": "#7c7c7c",
-    "light": "#050505",
-    "dark": "#bcbcbc"
-  },
-  "favicon": "https://media.brand.dev/80fd475b-c323-4297-b133-6cb648f6db88.svg",
-  "logo": {
-    "light": "https://media.brand.dev/6c01df2a-a0f1-4380-be51-9d7862d5e99e.svg",
-    "dark": "https://media.brand.dev/6c01df2a-a0f1-4380-be51-9d7862d5e99e.svg"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/devdavco/backend_1"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/devdavco/backend_1"
-    }
-  },
+  "primaryColor": "#7c7c7c",
+  "lightColor": "#050505",
+  "darkColor": "#bcbcbc",
   "navigation": {
     "tabs": [
       {
@@ -83,5 +66,33 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Space (Espacio) management: create, retrieve, and delete coworking spaces with capacity and cleaning time",
+    "Reservation (Reserva) lifecycle: create, read, update status, and delete bookings with conflict-aware scheduling",
+    "User (Usuario) management: register, retrieve, and delete users with email uniqueness enforcement",
+    "OpenAPI / Swagger UI available at /api-docs via springdoc-openapi",
+    "PostgreSQL backend with SSL support (Supabase-compatible)",
+    "Optimistic locking on Reserva entities via JPA @Version",
+    "CORS configured for the companion Next.js dashboard (swagger-to-ui)",
+    "Global exception handling for duplicate-email errors via @RestControllerAdvice"
+  ],
+  "publicApiSurface": [
+    "GET /espacios/all",
+    "GET /espacios/{id}",
+    "POST /espacios/create",
+    "DELETE /espacios/eliminar/{id}",
+    "GET /espacios/ping",
+    "GET /reserva/all",
+    "GET /reserva/{id}",
+    "POST /reserva/create",
+    "PUT /reserva/update/{id}",
+    "DELETE /reserva/eliminar/{id}",
+    "GET /reserva/ping",
+    "GET /usuarios/all",
+    "GET /usuarios/{id}",
+    "POST /usuarios/create",
+    "DELETE /usuarios/eliminar/{id}",
+    "GET /usuarios/ping"
+  ]
 }

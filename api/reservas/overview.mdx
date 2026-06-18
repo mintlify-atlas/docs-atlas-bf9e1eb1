@@ -1,0 +1,104 @@
+---
+title: "Reservas API: Booking and Scheduling Endpoints"
+sidebarTitle: "Overview"
+description: "The Reservas endpoints manage coworking space bookings. Create reservations with time windows, update their status, and list or delete existing bookings."
+---
+
+The Reservas API is the core scheduling surface of the CoworkingBooking platform. It lets clients create new bookings against a coworking space (`espacioId`) on behalf of a registered user (`usuarioId`), track each booking's lifecycle through its `estado` field, and clean up cancelled or expired records. Every reservation carries three distinct timestamps that together represent the user's window and the post-session cleaning buffer, all serialised in `yyyy-MM-dd HH:mm` format.
+
+## Base path
+
+All Reservas endpoints are mounted under `/reserva` (singular).
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/reserva/all` | List all reservations |
+| `GET` | `/reserva/{id}` | Retrieve a single reservation by ID |
+| `POST` | `/reserva/create` | Create a new reservation |
+| `PUT` | `/reserva/update/{id}` | Update the status of a reservation |
+| `DELETE` | `/reserva/eliminar/{id}` | Delete a reservation by ID |
+
+## The Reserva object
+
+Every endpoint that returns reservation data uses the same shape.
+
+<ResponseField name="id" type="integer">
+  Auto-generated primary key for the reservation. Assigned by the database on creation.
+</ResponseField>
+
+<ResponseField name="usuarioId" type="integer">
+  ID of the registered user who owns this booking. Corresponds to an existing `Usuario` record.
+</ResponseField>
+
+<ResponseField name="espacioId" type="integer">
+  ID of the coworking space being reserved. Corresponds to an existing `Espacio` record.
+</ResponseField>
+
+<ResponseField name="horaInicio" type="string">
+  Booking start time. Serialised as `yyyy-MM-dd HH:mm`. Example: `"2025-06-10 09:00"`.
+</ResponseField>
+
+<ResponseField name="horaFinUsuario" type="string">
+  The time at which the user's session ends. Serialised as `yyyy-MM-dd HH:mm`. Example: `"2025-06-10 11:00"`.
+</ResponseField>
+
+<ResponseField name="horaFinTotal" type="string">
+  The absolute end of the reservation slot, including the space's post-session cleaning buffer (`espacio.minutos_limpieza`). Serialised as `yyyy-MM-dd HH:mm`. Example: `"2025-06-10 11:30"`.
+</ResponseField>
+
+<ResponseField name="estado" type="string">
+  Current lifecycle status of the reservation. One of `confirmada`, `pendiente`, or `cancelada`.
+</ResponseField>
+
+<ResponseField name="version" type="integer">
+  Optimistic-locking counter managed by JPA's `@Version` mechanism. Incremented automatically on every successful write. Clients should treat this as opaque.
+</ResponseField>
+
+## Estado values
+
+| Value | Meaning |
+|-------|---------|
+| `confirmada` | The booking has been confirmed and the space is reserved. |
+| `pendiente` | The booking has been submitted but is awaiting confirmation. |
+| `cancelada` | The booking has been cancelled and the slot is available again. |
+
+## Example Reserva object
+
+```json
+{
+  "id": 7,
+  "usuarioId": 3,
+  "espacioId": 2,
+  "horaInicio": "2025-06-10 09:00",
+  "horaFinUsuario": "2025-06-10 11:00",
+  "horaFinTotal": "2025-06-10 11:30",
+  "estado": "confirmada",
+  "version": 1
+}
+```
+
+<Note>
+  All three timestamp fields (`horaInicio`, `horaFinUsuario`, `horaFinTotal`) are serialised and deserialised using the strict pattern `yyyy-MM-dd HH:mm`. Submitting a timestamp in any other format (e.g. ISO 8601 with seconds or timezone offset) will cause the request to fail.
+</Note>
+
+## Endpoint pages
+
+<CardGroup cols={2}>
+  <Card title="GET /all" icon="list" href="/api/reservas/get-all">
+    Retrieve all reservations in the system as a JSON array.
+  </Card>
+  <Card title="GET /{id}" icon="magnifying-glass" href="/api/reservas/get-by-id">
+    Fetch a single reservation by its integer ID.
+  </Card>
+  <Card title="POST /create" icon="plus" href="/api/reservas/create">
+    Create a new reservation with time windows and status.
+  </Card>
+  <Card title="PUT /update/{id}" icon="pen-to-square" href="/api/reservas/update">
+    Update the status of an existing reservation.
+  </Card>
+  <Card title="DELETE /eliminar/{id}" icon="trash" href="/api/reservas/delete">
+    Delete a reservation permanently by its ID.
+  </Card>
+</CardGroup>

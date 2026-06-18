@@ -1,0 +1,49 @@
+---
+title: "DELETE /usuarios/eliminar/{id} — Remove a User Account"
+sidebarTitle: "DELETE /eliminar"
+description: "Delete a user by their integer ID. Returns a plain text success message. Ensure no active reservations reference this user before deleting."
+---
+
+The `DELETE /usuarios/eliminar/{id}` endpoint permanently removes a user account from the CoworkingBooking system. The operation first looks up the user by their ID, then deletes the record from the database. On success, the server responds with a plain text confirmation message. This action is irreversible — there is no soft-delete or trash mechanism.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the user to delete. Must match an existing user record. If no user is found for this ID, the service throws a `RuntimeException` which results in a `500` error (see warnings below).
+</ParamField>
+
+---
+
+## Request
+
+```bash
+curl -X DELETE http://localhost:8080/usuarios/eliminar/1
+```
+
+---
+
+## Response
+
+### 200 OK
+
+Returns a `200 OK` status with the following plain text body — no JSON wrapper:
+
+```
+Usuario eliminada exitosamente
+```
+
+<Note>
+  The response body is a plain text string, not a JSON object. Do not attempt to parse it as JSON. The `Content-Type` header will reflect `text/plain`.
+</Note>
+
+---
+
+## Error responses
+
+<Warning>
+  **Orphaned Reserva records.** If the user being deleted has existing `Reserva` (booking) records that reference them via a foreign key, the database will reject the deletion and Spring Boot will propagate an exception as a **500 Internal Server Error**. Before calling this endpoint, verify that all reservations belonging to the user have been cancelled or reassigned to avoid FK constraint violations.
+</Warning>
+
+<Warning>
+  **ID not found returns 500, not 404.** If no user exists for the supplied `id`, the service throws an unhandled `RuntimeException` (`"Usuario no encontrado con ID: {id}"`), which Spring Boot maps to a **500 Internal Server Error**. Validate that the user ID exists (e.g., via `GET /usuarios/{id}`) before attempting deletion.
+</Warning>

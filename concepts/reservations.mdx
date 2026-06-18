@@ -1,0 +1,220 @@
+---
+title: "How Reservations Work in CoworkingBooking"
+sidebarTitle: "Reservations"
+description: "Learn how CoworkingBooking handles reservation creation, status lifecycle, time window validation, and optimistic locking to prevent double-bookings."
+---
+
+A reservation (`Reserva`) is the central transaction in CoworkingBooking — it binds a registered user to a physical space for a defined time window. From the moment a reservation is created it moves through a lifecycle of states (`pendiente` → `confirmada` → `cancelada`), and every update is guarded by an optimistic-lock counter to ensure that concurrent API calls can never silently overwrite each other. This page explains the full lifecycle: how to create a reservation, how to update its state, the three-timestamp timing model, and how the system defends against race conditions.
+
+---
+
+## Reservation States
+
+Every `Reserva` record carries an `estado` field (max 20 characters) that reflects where it is in its lifecycle. The field is a plain string — the API does not enforce an enum at the database level, so the values below are the conventions the service layer uses.
+
+<Tabs>
+  <Tab title="pendiente">
+    **Pending** — the reservation has been created but not yet confirmed by an administrator or by the system's confirmation flow. The space is tentatively held but the booking is not yet active.
+
+    ```json
+    { "estado": "pendiente" }
+    ```
+  </Tab>
+  <Tab title="confirmada">
+    **Confirmed** — the reservation is active and the user is entitled to use the space during the booked window. This is the normal operational state for an approved booking.
+
+    ```json
+    { "estado": "confirmada" }
+    ```
+  </Tab>
+  <Tab title="cancelada">
+    **Cancelled** — the reservation has been cancelled and the space is considered free for the previously booked window. A cancelled reservation is retained in the database for auditing purposes.
+
+    ```json
+    { "estado": "cancelada" }
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Time Window Model
+
+Each reservation records three timestamps that together define how long a space is physically occupied:
+
+| Field            | Meaning                                                                                      |
+|------------------|----------------------------------------------------------------------------------------------|
+| `horaInicio`     | When the user enters the space — the start of the booked session.                            |
+| `horaFinUsuario` | When the user's booked time ends — the last moment they may use the space.                   |
+| `horaFinTotal`   | `horaFinUsuario` + `espacio.minutos_limpieza` — the space is unavailable until this time.    |
+
+The cleaning buffer (`minutos_limpieza`) lives on the `Espacio` entity and is applied at booking time. Because `horaFinTotal` is persisted on the `Reserva`, scheduling queries can check overlap using a single field rather than performing arithmetic on the fly.
+
+<Warning>
+  Any overlap-detection logic **must compare against `horaFinTotal`**, not `horaFinUsuario`. A new reservation whose `horaInicio` falls between `horaFinUsuario` and `horaFinTotal` would collide with the cleaning window and must be rejected.
+</Warning>
+
+**Example:** A space with `minutos_limpieza = 15` is booked from 09:00 to 11:00.
+
+```
+│─── User session ──────────────────────│─── Cleaning ───│
+09:00                               11:00            11:15
+▲                                        ▲              ▲
+horaInicio                       horaFinUsuario   horaFinTotal
+```
+
+The space is available again only at `11:15` (`horaFinTotal`).
+
+---
+
+## Creating a Reservation
+
+To create a reservation, send a `POST` request to `/reserva/save` with a JSON body matching `CreateReservaRequest`.
+
+### Validation rules (enforced by `ReservaServiceImpl`)
+
+The service layer performs the following checks **in order** before persisting:
+
+1. The request object must not be `null`.
+2. `usuarioId` must be non-null and greater than `0`.
+3. `espacioId` must be non-null and greater than `0`.
+4. The `Usuario` identified by `usuarioId` must exist in the database.
+5. The `Espacio` identified by `espacioId` must exist in the database.
+
+If any check fails, an `Exception` is thrown with a descriptive message and the reservation is not saved.
+
+### Request fields
+
+<ParamField body="espacioId" type="integer" required>
+  The ID of the `Espacio` to reserve. Must be greater than `0` and must reference an existing record.
+</ParamField>
+
+<ParamField body="usuarioId" type="integer" required>
+  The ID of the `Usuario` making the reservation. Must be greater than `0` and must reference an existing record.
+</ParamField>
+
+<ParamField body="horaInicio" type="string" required>
+  Start timestamp of the booking. **Must use the format `yyyy-MM-dd HH:mm`** (e.g., `"2025-07-15 09:00"`).
+</ParamField>
+
+<ParamField body="horaFinUsuario" type="string" required>
+  End timestamp of the user's session. **Must use the format `yyyy-MM-dd HH:mm`**.
+</ParamField>
+
+<ParamField body="horaFinTotal" type="string" required>
+  End timestamp including the cleaning buffer (`horaFinUsuario` + `minutos_limpieza`). **Must use the format `yyyy-MM-dd HH:mm`**.
+</ParamField>
+
+<ParamField body="estado" type="string">
+  Initial lifecycle state. Recommended values: `"pendiente"`, `"confirmada"`, `"cancelada"`.
+</ParamField>
+
+<ParamField body="version" type="integer">
+  Optimistic-lock seed value. Typically sent as `0` or `null` on creation; JPA manages this field automatically after the first save.
+</ParamField>
+
+<Warning>
+  All three timestamp fields — `horaInicio`, `horaFinUsuario`, and `horaFinTotal` — **must** be formatted as `yyyy-MM-dd HH:mm`. The Jackson `@JsonFormat` annotation on `CreateReservaRequest` will reject any other format and return a deserialization error. Do not include seconds or timezone offsets.
+</Warning>
+
+### Example request
+
+```json
+{
+  "espacioId": 3,
+  "usuarioId": 7,
+  "horaInicio": "2025-07-15 09:00",
+  "horaFinUsuario": "2025-07-15 11:00",
+  "horaFinTotal": "2025-07-15 11:15",
+  "estado": "pendiente",
+  "version": 0
+}
+```
+
+### Example response (`201 Created`)
+
+```json
+{
+  "id": 42,
+  "usuarioId": 7,
+  "espacioId": 3,
+  "horaInicio": "2025-07-15T09:00:00.000+00:00",
+  "horaFinUsuario": "2025-07-15T11:00:00.000+00:00",
+  "horaFinTotal": "2025-07-15T11:15:00.000+00:00",
+  "estado": "pendiente",
+  "version": 0
+}
+```
+
+---
+
+## Updating a Reservation
+
+Send a `PUT` request to `/reserva/update/{id}` to update an existing reservation. The current implementation allows updating **only the `estado` field** — timestamps and foreign-key references are immutable once a reservation is created.
+
+### Request fields (`UpdateReservaRequest`)
+
+<ParamField body="id" type="integer">
+  The ID of the reservation to update. Also supplied as the path variable `{id}`; if included in the body it is present for reference but the path variable takes precedence in routing.
+</ParamField>
+
+<ParamField body="estado" type="string" required>
+  The new lifecycle state. Accepted values: `"confirmada"`, `"pendiente"`, `"cancelada"`.
+</ParamField>
+
+### Example request
+
+```json
+{
+  "id": 42,
+  "estado": "confirmada"
+}
+```
+
+### Example response (`200 OK`)
+
+```json
+{
+  "id": 42,
+  "usuarioId": 7,
+  "espacioId": 3,
+  "horaInicio": "2025-07-15T09:00:00.000+00:00",
+  "horaFinUsuario": "2025-07-15T11:00:00.000+00:00",
+  "horaFinTotal": "2025-07-15T11:15:00.000+00:00",
+  "estado": "confirmada",
+  "version": 1
+}
+```
+
+<Note>
+  Notice that `version` has incremented from `0` to `1`. JPA automatically bumps this counter on every successful save. The client must treat the value returned in each response as the authoritative current version.
+</Note>
+
+---
+
+## Optimistic Locking
+
+The `Reserva` entity carries a `@Version`-annotated `version` column. This is the standard JPA mechanism for **optimistic concurrency control** — it prevents two concurrent requests from silently overwriting each other's changes without requiring the database to hold a row-level lock for the duration of a request.
+
+### How it works
+
+```
+Client A reads Reserva 42  →  version = 1
+Client B reads Reserva 42  →  version = 1
+
+Client A sends PUT /reserva/update/42  →  JPA issues:
+  UPDATE reservas SET estado='confirmada', version=2
+  WHERE id=42 AND version=1   ← version check
+  → 1 row affected. Commit succeeds. version is now 2.
+
+Client B sends PUT /reserva/update/42  →  JPA issues:
+  UPDATE reservas SET estado='cancelada', version=2
+  WHERE id=42 AND version=1   ← version is now 2, not 1!
+  → 0 rows affected. JPA throws OptimisticLockException.
+```
+
+When `OptimisticLockException` is thrown the transaction is rolled back. Client B receives a server error response indicating the conflict. The correct recovery strategy is to re-fetch the reservation (to obtain the current `version`), apply changes to the fresh data, and retry the update.
+
+<Warning>
+  If your client caches a `Reserva` response and later sends an update using a stale `version`, the update **will fail**. Always re-fetch the reservation immediately before sending an update in high-concurrency scenarios.
+</Warning>

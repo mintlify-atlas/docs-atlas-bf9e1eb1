@@ -1,0 +1,90 @@
+---
+title: "PUT /reserva/update/{id} — Update Reservation Status"
+sidebarTitle: "PUT /update"
+description: "Update the status of an existing reservation. Only the estado field can be changed. Returns the full updated Reserva object with an incremented version."
+---
+
+The `PUT /reserva/update/{id}` endpoint is a deliberately scoped mutation: it changes **only the `estado` field** of an existing reservation. Time windows (`horaInicio`, `horaFinUsuario`, `horaFinTotal`), participant IDs (`usuarioId`, `espacioId`), and the `version` counter are all managed by the server and cannot be overridden through this endpoint. The response returns the complete, updated `Reserva` object reflecting the new status and the incremented `version`.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the reservation to update. Must reference an existing record in the `reservas` table.
+</ParamField>
+
+## Request body
+
+<ParamField body="id" type="integer">
+  The reservation ID. This mirrors the path parameter and is carried in the `UpdateReservaRequest` DTO. Both must reference the same reservation.
+</ParamField>
+
+<ParamField body="estado" type="string" required>
+  The new status for the reservation. Must be one of `confirmada`, `pendiente`, or `cancelada`.
+</ParamField>
+
+## Request
+
+```bash
+curl -X PUT http://localhost:8080/reserva/update/1 \
+  -H "Content-Type: application/json" \
+  -d '{"id": 1, "estado": "cancelada"}'
+```
+
+## Response
+
+Returns `200 OK` with the full updated `UpdateReservaResponse` object.
+
+```json
+{
+  "id": 1,
+  "usuarioId": 2,
+  "espacioId": 1,
+  "horaInicio": "2025-06-10 08:00",
+  "horaFinUsuario": "2025-06-10 10:00",
+  "horaFinTotal": "2025-06-10 10:30",
+  "estado": "cancelada",
+  "version": 1
+}
+```
+
+## Response fields
+
+<ResponseField name="id" type="integer">
+  The reservation's primary key, unchanged from creation.
+</ResponseField>
+
+<ResponseField name="usuarioId" type="integer">
+  ID of the user who owns the booking. Not modified by this endpoint.
+</ResponseField>
+
+<ResponseField name="espacioId" type="integer">
+  ID of the reserved coworking space. Not modified by this endpoint.
+</ResponseField>
+
+<ResponseField name="horaInicio" type="string">
+  Original start time in `yyyy-MM-dd HH:mm` format. Not modified by this endpoint.
+</ResponseField>
+
+<ResponseField name="horaFinUsuario" type="string">
+  Original user session end time in `yyyy-MM-dd HH:mm` format. Not modified by this endpoint.
+</ResponseField>
+
+<ResponseField name="horaFinTotal" type="string">
+  Original absolute end time (including cleaning buffer) in `yyyy-MM-dd HH:mm` format. Not modified by this endpoint.
+</ResponseField>
+
+<ResponseField name="estado" type="string">
+  The newly applied status. One of `confirmada`, `pendiente`, or `cancelada`.
+</ResponseField>
+
+<ResponseField name="version" type="integer">
+  Optimistic-locking counter. JPA's `@Version` mechanism increments this value automatically every time the record is saved. After a successful update this will be one higher than the value returned by the previous read.
+</ResponseField>
+
+<Note>
+  Because the `Reserva` entity uses JPA's `@Version` annotation for optimistic locking, the `version` field in the response will always be incremented by `1` compared to the value present before the update. If two concurrent requests attempt to update the same reservation, the second will encounter an `OptimisticLockException` and fail.
+</Note>
+
+<Warning>
+  This endpoint only mutates `estado`. Attempting to change timestamps, `usuarioId`, or `espacioId` through the request body will have no effect — those fields are not read from `UpdateReservaRequest` and will not be persisted. To modify those fields a new reservation should be created.
+</Warning>

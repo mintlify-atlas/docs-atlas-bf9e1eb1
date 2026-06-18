@@ -1,0 +1,47 @@
+---
+title: "DELETE /espacios/eliminar/{id} — Remove a Coworking Space"
+sidebarTitle: "DELETE /eliminar"
+description: "Delete a coworking space by its ID. Returns a plain text confirmation message on success, or an error if the space does not exist."
+---
+
+The `DELETE /espacios/eliminar/{id}` endpoint permanently removes a coworking space from the system. The service looks up the space by its integer `id`, deletes the entity from the database via JPA, and responds with a plain-text confirmation. This operation is irreversible — once a space is deleted it cannot be recovered through the API.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the coworking space to delete. You can discover valid IDs by calling [`GET /espacios/all`](/api/espacios/get-all) or [`GET /espacios/{id}`](/api/espacios/get-by-id).
+</ParamField>
+
+## Request
+
+No request body or query parameters are required. No authentication headers are needed.
+
+### Example request
+
+```bash
+curl -X DELETE http://localhost:8080/espacios/eliminar/1
+```
+
+## Response
+
+### 200 OK
+
+On success the endpoint returns **HTTP 200 OK** with a plain-text body (not JSON):
+
+```
+Reserva eliminada exitosamente
+```
+
+<Note>
+  The confirmation message reads `"Reserva eliminada exitosamente"` — this is the literal string returned by the controller's `ResponseEntity.ok(...)` call, even though the deleted resource is a space (`Espacio`) rather than a reservation (`Reserva`). This is a known naming inconsistency in the current implementation.
+</Note>
+
+## Errors
+
+<Warning>
+  If no coworking space with the given `id` exists, the service throws a `RuntimeException` with the message `"Reserva no encontrada con ID: {id}"`. Spring Boot propagates this as an unhandled exception and returns **HTTP 500 Internal Server Error**. Always verify that the space exists before attempting deletion.
+</Warning>
+
+<Warning>
+  Deleting a coworking space that is referenced by one or more `Reserva` records may trigger a **database foreign-key constraint violation**, causing the operation to fail with an **HTTP 500 Internal Server Error**. Before deleting a space, ensure that all associated reservations have been cancelled or removed. The API does not cascade deletions to related reservations automatically.
+</Warning>

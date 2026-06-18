@@ -1,0 +1,80 @@
+---
+title: "Espacios API: Manage Coworking Spaces"
+sidebarTitle: "Overview"
+description: "The Espacios endpoints let you create, retrieve, and delete coworking spaces. Each space has a name, type, capacity, and cleaning buffer in minutes."
+---
+
+The **Espacios** resource represents the physical coworking spaces available for booking in the CoworkingBooking system. Each space is identified by a unique integer ID and carries metadata describing its name, functional type, maximum occupancy, and the number of minutes reserved after every booking for cleaning. You can list all spaces, fetch a single space by ID, register a new space, and remove an existing one.
+
+## Base path
+
+All Espacios endpoints share the following base path:
+
+```
+/espacios
+```
+
+The full base URL in a local development environment is `http://localhost:8080/espacios`.
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/espacios/ping` | Health check — returns the string `"pong"` |
+| `GET` | `/espacios/all` | List all registered coworking spaces |
+| `GET` | `/espacios/{id}` | Retrieve a single space by its integer ID |
+| `POST` | `/espacios/create` | Register a new coworking space |
+| `DELETE` | `/espacios/eliminar/{id}` | Permanently delete a space by its integer ID |
+
+## The Espacio object
+
+Every endpoint that returns space data uses the following shape. Fields are drawn directly from the `GetEspacioResponse` DTO and the `Espacio` JPA entity.
+
+<ResponseField name="id" type="integer">
+  Auto-generated primary key assigned by the database on creation. This value is read-only and cannot be set by the caller.
+</ResponseField>
+
+<ResponseField name="nombre" type="string" required>
+  Human-readable name of the coworking space. Maximum 50 characters. Cannot be null or blank.
+</ResponseField>
+
+<ResponseField name="tipo" type="string" required>
+  Functional category of the space — for example `sala_reunion`, `auditorio`, or `oficina_privada`. Maximum 30 characters. Cannot be null or blank.
+</ResponseField>
+
+<ResponseField name="capacidad" type="integer" required>
+  Maximum number of people the space can accommodate at one time. Must be a non-zero positive integer.
+</ResponseField>
+
+<ResponseField name="minutos_limpieza" type="integer" required>
+  Number of minutes automatically blocked after each booking ends to allow cleaning before the next reservation can begin. Must be a non-zero positive integer.
+</ResponseField>
+
+### Example Espacio object
+
+```json
+{
+  "id": 1,
+  "nombre": "Sala de Reuniones A",
+  "tipo": "sala_reunion",
+  "capacidad": 10,
+  "minutos_limpieza": 15
+}
+```
+
+## Endpoint pages
+
+<CardGroup cols={2}>
+  <Card title="GET /all" icon="list" href="/api/espacios/get-all">
+    Retrieve the full list of registered coworking spaces.
+  </Card>
+  <Card title="GET /{id}" icon="magnifying-glass" href="/api/espacios/get-by-id">
+    Fetch a single coworking space by its integer ID.
+  </Card>
+  <Card title="POST /create" icon="plus" href="/api/espacios/create">
+    Register a brand-new coworking space in the system.
+  </Card>
+  <Card title="DELETE /eliminar/{id}" icon="trash" href="/api/espacios/delete">
+    Permanently remove a coworking space by its integer ID.
+  </Card>
+</CardGroup>

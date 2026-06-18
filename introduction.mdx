@@ -1,0 +1,86 @@
+---
+title: "CoworkingBooking API: Space Reservation Service Overview"
+sidebarTitle: "Introduction"
+description: "CoworkingBooking is a Spring Boot REST API for managing coworking spaces, users, and bookings with PostgreSQL persistence and OpenAPI documentation."
+---
+
+CoworkingBooking is a Spring Boot 4 REST API designed to manage the full lifecycle of coworking space reservations — from registering shared workspaces and meeting rooms to creating and tracking bookings for individual users. Built for educational and production-ready deployment scenarios alike, it provides a clean JSON interface over three core resources (`Espacio`, `Usuario`, `Reserva`), backed by a PostgreSQL database and fully documented via OpenAPI 3.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Three REST Resources" icon="server">
+    Full CRUD endpoints for **Espacios** (spaces), **Usuarios** (users), and **Reservas** (bookings), each under its own base path (`/espacios`, `/usuarios`, `/reserva`).
+  </Card>
+  <Card title="OpenAPI / Swagger UI" icon="file-code">
+    Interactive API documentation generated automatically by `springdoc-openapi`. The raw spec is served at `/api-docs` and the browser UI at `/swagger-ui.html`.
+  </Card>
+  <Card title="PostgreSQL + JPA Persistence" icon="database">
+    All data is persisted in PostgreSQL via Spring Data JPA and Hibernate. SSL-enforced connections make the setup compatible with hosted providers such as Supabase out of the box.
+  </Card>
+  <Card title="CORS Support" icon="globe">
+    Every controller carries a `@CrossOrigin` annotation, allowing the companion Next.js dashboard (or any approved frontend origin) to call the API directly from a browser without proxy configuration.
+  </Card>
+  <Card title="Global Error Handling" icon="triangle-exclamation">
+    Service-layer exceptions are caught and surfaced as structured HTTP error responses, keeping client-side error handling predictable across all endpoints.
+  </Card>
+  <Card title="HikariCP Connection Pool" icon="bolt">
+    The embedded HikariCP pool is pre-configured with a maximum of 10 connections and schema pinning, ensuring efficient resource usage under concurrent load.
+  </Card>
+</CardGroup>
+
+## Architecture Overview
+
+CoworkingBooking follows a classic Spring layered architecture. An incoming HTTP request travels through four layers before touching the database:
+
+```
+HTTP Request
+     │
+     ▼
+┌─────────────┐
+│  Controller │  ← @RestController, handles routing & HTTP status
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│   Service   │  ← Business logic, validation, exception handling
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ Repository  │  ← Spring Data JPA interface, auto-generated queries
+└──────┬──────┘
+       │
+       ▼
+┌─────────────┐
+│ JPA Entity  │  ← @Entity mapped to a PostgreSQL table
+└─────────────┘
+```
+
+The three resources managed by the API are:
+
+| Resource | Base Path | Description |
+|---|---|---|
+| **Espacio** | `/espacios` | Coworking spaces and meeting rooms, including type, capacity, and post-session cleaning buffer |
+| **Usuario** | `/usuarios` | Registered users with a role (`usuario` or admin) and hashed password |
+| **Reserva** | `/reserva` | Bookings that link a user to a space with start time, user end time, total end time (including cleaning), and status |
+
+<Note>
+  The repository also includes a companion **Next.js dashboard** (`swagger-to-ui/`) that consumes this API and provides a browser-based UI for managing spaces, users, and bookings. Configure its target API with the `NEXT_PUBLIC_API_URL` environment variable.
+</Note>
+
+## Base URL
+
+The API runs on port `8080` by default when started locally:
+
+```
+http://localhost:8080
+```
+
+The companion Next.js dashboard reads its target API address from the `NEXT_PUBLIC_API_URL` environment variable, falling back to `http://localhost:8080` when the variable is not set:
+
+```ts
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+```
+
+Set `NEXT_PUBLIC_API_URL` in your `.env.local` file (Next.js dashboard) or as a deployment environment variable to point the frontend at a hosted API instance.

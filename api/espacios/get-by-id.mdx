@@ -1,0 +1,67 @@
+---
+title: "GET /espacios/{id} — Retrieve a Space by ID"
+sidebarTitle: "GET /{id}"
+description: "Fetch a single coworking space by its integer ID. Returns the Espacio object or throws a RuntimeException if the ID does not exist."
+---
+
+The `GET /espacios/{id}` endpoint retrieves a single coworking space whose `id` matches the integer you supply in the URL path. Use this endpoint when you need the full details of one specific space — for example, to display a space detail page, pre-fill an edit form, or confirm that a space exists before creating a reservation against it.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the coworking space to retrieve. This value is assigned by the database when the space is created and can be discovered by calling [`GET /espacios/all`](/api/espacios/get-all).
+</ParamField>
+
+## Request
+
+No request body or query parameters are required. No authentication headers are needed.
+
+### Example request
+
+```bash
+curl http://localhost:8080/espacios/1
+```
+
+## Response
+
+### 200 OK
+
+Returns a single JSON Espacio object when the ID exists.
+
+```json
+{
+  "id": 1,
+  "nombre": "Sala de Reuniones A",
+  "tipo": "sala_reunion",
+  "capacidad": 10,
+  "minutos_limpieza": 15
+}
+```
+
+### Response fields
+
+<ResponseField name="id" type="integer">
+  The unique identifier of the retrieved coworking space. Matches the `{id}` supplied in the request path.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  Human-readable name of the space. Up to 50 characters.
+</ResponseField>
+
+<ResponseField name="tipo" type="string">
+  Functional category of the space (e.g., `sala_reunion`, `auditorio`, `oficina_privada`). Up to 30 characters.
+</ResponseField>
+
+<ResponseField name="capacidad" type="integer">
+  Maximum number of people the space can accommodate simultaneously.
+</ResponseField>
+
+<ResponseField name="minutos_limpieza" type="integer">
+  Number of minutes automatically blocked after each booking ends for cleaning before the next booking can begin.
+</ResponseField>
+
+## Errors
+
+<Warning>
+  If no coworking space with the given `id` exists, the service throws a `RuntimeException` with the message `"Reserva no encontrada con ID: {id}"`. Spring Boot will propagate this as an unhandled exception and return an **HTTP 500 Internal Server Error**. There is currently no dedicated 404 response for this endpoint — validate that the ID exists (via `GET /espacios/all`) before calling this endpoint with user-supplied input.
+</Warning>

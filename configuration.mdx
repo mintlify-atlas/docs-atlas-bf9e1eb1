@@ -1,0 +1,202 @@
+---
+title: "Configure CoworkingBooking API for Your Environment"
+sidebarTitle: "Configuration"
+description: "Learn how to configure database connection, environment variables, connection pool, SSL, and CORS settings for the CoworkingBooking API."
+---
+
+All runtime configuration for the CoworkingBooking API is driven by Spring Boot's `src/main/resources/application.properties` file. Sensitive values (database host, port, name, credentials) are externalised into environment variables so that the same artifact can run in development, staging, and production without code changes.
+
+## Database Configuration
+
+The datasource URL is assembled at startup from five environment variables:
+
+```properties
+spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&currentSchema=public
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASSWORD}
+spring.datasource.driver-class-name=org.postgresql.Driver
+```
+
+<ParamField path="DB_HOST" type="string" required>
+  Hostname or IP address of the PostgreSQL server. Examples: `localhost`, `db.abcxyz.supabase.co`.
+</ParamField>
+
+<ParamField path="DB_PORT" type="integer" required>
+  Port on which PostgreSQL is listening. Standard value is `5432`. Supabase connection-pooler port is `6543`.
+</ParamField>
+
+<ParamField path="DB_NAME" type="string" required>
+  Name of the target database. Example: `coworking_db`.
+</ParamField>
+
+<ParamField path="DB_USER" type="string" required>
+  Database username. Example: `coworking_usr`.
+</ParamField>
+
+<ParamField path="DB_PASSWORD" type="string" required>
+  Password for the database user. Keep this out of version control.
+</ParamField>
+
+### Local development override
+
+`application.properties` ships with commented-out local overrides that bypass environment variables entirely, useful for quick local testing without exporting variables:
+
+```properties
+#spring.datasource.url=jdbc:postgresql://localhost:5433/backend_db
+#spring.datasource.username=backend_usr
+#spring.datasource.password=backend_pwd
+```
+
+Uncomment these three lines (and comment out the `${DB_*}` variants above them) to connect directly to a local PostgreSQL instance on port `5433`.
+
+---
+
+## Connection Pool (HikariCP)
+
+Spring Boot's embedded HikariCP pool is configured with two explicit settings:
+
+```properties
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.schema=public
+```
+
+| Property | Value | Effect |
+|---|---|---|
+| `maximum-pool-size` | `10` | Upper bound on the number of live connections in the pool. Increase for high-concurrency workloads; reduce for constrained hosted databases. |
+| `schema` | `public` | Pins every connection to the `public` schema, matching the `currentSchema=public` query parameter in the JDBC URL. |
+
+A connection-test query is also enabled to validate borrowed connections before use:
+
+```properties
+spring.datasource.hikari.connection-test-query=SELECT 1
+```
+
+---
+
+## SSL
+
+SSL is **mandatory** in this configuration and cannot be disabled without modifying both the JDBC URL and the Hibernate driver properties. Three settings work together to enforce it:
+
+```properties
+# JDBC URL parameter
+spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&currentSchema=public
+
+# Hibernate JDBC driver properties
+spring.jpa.properties.hibernate.connection.ssl=true
+spring.jpa.properties.hibernate.connection.sslMode=require
+```
+
+`sslmode=require` in the JDBC URL instructs the PostgreSQL JDBC driver to negotiate a TLS connection and reject the connection if the server does not support SSL. The matching Hibernate properties (`hibernate.connection.ssl=true` and `hibernate.connection.sslMode=require`) enforce the same constraint at the ORM layer.
+
+<Warning>
+  Removing `sslmode=require` will cause connections to **Supabase and most hosted PostgreSQL providers to fail**, as they mandate SSL. Only remove it if you are connecting to a local PostgreSQL instance that has not been configured with SSL certificates.
+</Warning>
+
+---
+
+## OpenAPI Documentation
+
+The OpenAPI 3 specification path is customised from the default (`/v3/api-docs`) to a shorter path:
+
+```properties
+springdoc.api-docs.path=/api-docs
+```
+
+| URL | Description |
+|---|---|
+| `http://localhost:8080/api-docs` | Raw OpenAPI 3 JSON specification |
+| `http://localhost:8080/swagger-ui.html` | Interactive Swagger UI browser interface |
+
+The Swagger UI is provided by the `springdoc-openapi-starter-webmvc-ui` dependency (`3.0.2`) declared in `pom.xml` and requires no additional configuration to enable.
+
+---
+
+## JPA / DDL Auto
+
+```properties
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+```
+
+`ddl-auto=update` tells Hibernate to compare the JPA entity model against the live database schema at startup and apply any **additive** changes (new tables, new columns). It will **not** drop columns or tables that have been removed from the entity model.
+
+<Warning>
+  **Do not use `ddl-auto=update` in production.** It can silently alter your schema in unexpected ways. For production deployments, set `ddl-auto=validate` (to confirm the schema matches entities without touching it) or `ddl-auto=none`, and manage schema migrations with a dedicated tool such as **Flyway** or **Liquibase**.
+</Warning>
+
+`show-sql=true` logs every SQL statement issued by Hibernate to standard output. This is convenient during development but produces significant noise at scale; set it to `false` in production or route it to a debug log level.
+
+---
+
+## CORS Configuration
+
+Cross-Origin Resource Sharing is configured at the controller level using Spring's `@CrossOrigin` annotation. All three controllers (`EspacioController`, `ReservaController`, `UsuarioController`) carry identical annotations pointing to the deployed Next.js dashboard:
+
+```java
+// EspacioController.java
+//@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "https://backend-1-seven-murex.vercel.app")
+```
+
+The `localhost:3000` variant is present but commented out. To switch between local development and the deployed frontend, swap which line is commented:
+
+**Local development (Next.js on port 3000):**
+
+```java
+@CrossOrigin(origins = "http://localhost:3000")
+//@CrossOrigin(origins = "https://backend-1-seven-murex.vercel.app")
+```
+
+**Production / Vercel deployment:**
+
+```java
+//@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(origins = "https://backend-1-seven-murex.vercel.app")
+```
+
+This change must be made in all three controller files: `EspacioController.java`, `ReservaController.java`, and `UsuarioController.java`.
+
+<Note>
+  For a more maintainable approach in the long term, consider centralising CORS configuration in a `WebMvcConfigurer` bean (via `addCorsMappings`), where you can define allowed origins from a single property and even pull the allowed origin from an environment variable.
+</Note>
+
+---
+
+## Full `application.properties` Reference
+
+The complete properties file as shipped in the repository:
+
+```properties
+spring.application.name=coworkingbooking
+
+# --- Datasource (environment variables required) ---
+spring.datasource.url=jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?sslmode=require&currentSchema=public
+spring.datasource.username=${DB_USER}
+spring.datasource.password=${DB_PASSWORD}
+
+# --- Local development overrides (uncomment to use) ---
+#spring.datasource.url=jdbc:postgresql://localhost:5433/backend_db
+#spring.datasource.username=backend_usr
+#spring.datasource.password=backend_pwd
+
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# --- OpenAPI / Swagger UI ---
+springdoc.api-docs.path=/api-docs
+
+# --- HikariCP Connection Pool ---
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.connection-test-query=SELECT 1
+spring.datasource.hikari.schema=public
+
+# --- JPA / Hibernate ---
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.PostgreSQLDialect
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.jdbc.lob.non_contextual_creation=true
+
+# --- SSL (mandatory for Supabase and hosted PostgreSQL) ---
+spring.jpa.properties.hibernate.connection.ssl=true
+spring.jpa.properties.hibernate.connection.sslMode=require
+```

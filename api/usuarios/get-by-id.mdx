@@ -1,0 +1,71 @@
+---
+title: "GET /usuarios/{id} — Retrieve a User by ID"
+sidebarTitle: "GET /{id}"
+description: "Fetch a single user by their integer ID. Returns the Usuario object including nombre, email, rol, and password_hash, or a 500 error if not found."
+---
+
+The `GET /usuarios/{id}` endpoint fetches a single user account identified by its integer primary key. Use this when you already know a user's ID — for example, to display a profile page, pre-fill an edit form, or verify a user's role before granting access to a resource.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the user to retrieve. This value is assigned automatically when the user is created and is returned in every Usuario object under the `id` field.
+</ParamField>
+
+---
+
+## Request
+
+```bash
+curl http://localhost:8080/usuarios/1
+```
+
+---
+
+## Response
+
+### 200 OK
+
+Returns a single Usuario object when a user with the given ID exists.
+
+<ResponseField name="id" type="integer">
+  The auto-generated primary key of the user.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  The user's full display name (max 100 characters).
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The user's unique email address (max 150 characters).
+</ResponseField>
+
+<ResponseField name="password_hash" type="string">
+  The password value stored for this user. See the security warning below.
+</ResponseField>
+
+<ResponseField name="rol" type="string">
+  The user's role identifier — e.g., `"admin"` or `"usuario"`.
+</ResponseField>
+
+```json
+{
+  "id": 1,
+  "nombre": "María García",
+  "email": "maria@example.com",
+  "password_hash": "s3cr3tP@ssword",
+  "rol": "usuario"
+}
+```
+
+<Warning>
+  **`password_hash` is included in the response.** The server returns the stored password value as-is. Avoid exposing this endpoint to untrusted clients until proper password hashing is in place.
+</Warning>
+
+---
+
+### Error: ID not found
+
+<Warning>
+  If no user exists for the supplied `id`, the service throws an unhandled `RuntimeException` (`"Usuario no encontrado con ID: {id}"`). Spring Boot maps this to a **500 Internal Server Error** rather than a 404. Treat any 500 response from this endpoint as a potential "not found" condition and check the `id` value before retrying.
+</Warning>

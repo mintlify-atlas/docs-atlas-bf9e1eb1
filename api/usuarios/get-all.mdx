@@ -1,0 +1,70 @@
+---
+title: "GET /usuarios/all — List All Registered Users"
+sidebarTitle: "GET /all"
+description: "Retrieve a list of all users in the system. Returns an array of Usuario objects with id, nombre, email, rol, and password_hash fields."
+---
+
+The `GET /usuarios/all` endpoint returns every user account currently stored in the database as a JSON array. This is the quickest way to enumerate all registered members of the coworking platform — for example, to populate an admin dashboard or to verify newly created accounts. When no users exist the endpoint returns an empty array `[]`.
+
+## Parameters
+
+This endpoint accepts no path parameters, query parameters, or request body.
+
+---
+
+## Request
+
+```bash
+curl http://localhost:8080/usuarios/all
+```
+
+---
+
+## Response
+
+### 200 OK
+
+Returns a JSON array of Usuario objects. Each element in the array has the following fields:
+
+<ResponseField name="id" type="integer">
+  The auto-generated primary key of the user.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  The user's full display name (max 100 characters).
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The user's unique email address (max 150 characters).
+</ResponseField>
+
+<ResponseField name="password_hash" type="string">
+  The password value stored for this user. See the security warning below.
+</ResponseField>
+
+<ResponseField name="rol" type="string">
+  The user's role identifier — e.g., `"admin"` or `"usuario"`.
+</ResponseField>
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "María García",
+    "email": "maria@example.com",
+    "password_hash": "s3cr3tP@ssword",
+    "rol": "usuario"
+  },
+  {
+    "id": 2,
+    "nombre": "Carlos Administrador",
+    "email": "carlos.admin@example.com",
+    "password_hash": "4dm1nP@ss!",
+    "rol": "admin"
+  }
+]
+```
+
+<Warning>
+  **`password_hash` is included in every response object.** The server returns the stored password value as-is. Until server-side password hashing is implemented, avoid exposing this endpoint publicly or to untrusted clients.
+</Warning>

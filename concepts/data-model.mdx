@@ -1,0 +1,162 @@
+---
+title: "CoworkingBooking Data Model: Entities and Relationships"
+sidebarTitle: "Data Model"
+description: "Understand the three JPA entities in CoworkingBooking — Espacio, Usuario, and Reserva — their fields, types, and database relationships."
+---
+
+CoworkingBooking is built around three core JPA entities that map directly to database tables: **Espacio** (the physical coworking space), **Usuario** (the registered user), and **Reserva** (the reservation that links a user to a space for a specific time window). A `Reserva` holds foreign-key references to both `Espacio` and `Usuario`, making it the central relationship in the data model. Understanding these entities — their fields, constraints, and how they relate — is essential before working with any API endpoint.
+
+---
+
+## Espacio
+
+`Espacio` represents a bookable coworking space, such as a private office, meeting room, or open-desk area. It is stored in the `espacios` table.
+
+| Field               | Java Type | DB Column           | Nullable | Constraints          | Description                                                    |
+|---------------------|-----------|---------------------|----------|----------------------|----------------------------------------------------------------|
+| `id`                | `Integer` | `id`                | No       | PK, auto-increment   | Unique identifier for the space.                               |
+| `nombre`            | `String`  | `nombre`            | No       | max 50 chars         | Human-readable name of the space (e.g., "Sala Azul").          |
+| `tipo`              | `String`  | `tipo`              | No       | max 30 chars         | Category of the space (e.g., "privado", "abierto", "sala").    |
+| `capacidad`         | `Integer` | `capacidad`         | No       | —                    | Maximum number of people the space can accommodate.            |
+| `minutos_limpieza`  | `Integer` | `minutos_limpieza`  | No       | —                    | Buffer time in minutes reserved for cleaning after each booking. This value is added to `horaFinUsuario` to derive `horaFinTotal`. |
+
+<Tip>
+  The `minutos_limpieza` field is central to the scheduling model. It ensures that back-to-back reservations always include a cleaning window — the space is not available again until `horaFinTotal` has passed.
+</Tip>
+
+**API response shape (`GetEspacioResponse`):**
+
+```json
+{
+  "id": 3,
+  "nombre": "Sala Azul",
+  "tipo": "sala",
+  "capacidad": 8,
+  "minutos_limpieza": 15
+}
+```
+
+---
+
+## Usuario
+
+`Usuario` represents a registered user of the platform. It is stored in the `usuarios` table. The `email` column carries a `UNIQUE` database constraint — no two users may share the same email address.
+
+| Field           | Java Type | DB Column       | Nullable | Constraints              | Description                                               |
+|-----------------|-----------|-----------------|----------|--------------------------|-----------------------------------------------------------|
+| `id`            | `Integer` | `id`            | No       | PK, auto-increment       | Unique identifier for the user.                           |
+| `nombre`        | `String`  | `nombre`        | No       | max 100 chars            | Full name of the user.                                    |
+| `email`         | `String`  | `email`         | No       | UNIQUE, max 150 chars    | Email address used for identification. Must be unique.    |
+| `password_hash` | `String`  | `password_hash` | No       | max 255 chars            | Hashed representation of the user's password.            |
+| `rol`           | `String`  | `rol`           | No       | —                        | Role assigned to the user (e.g., `"admin"`, `"usuario"`). |
+
+<Note>
+  The `@NotBlank` constraint is enforced on `nombre` and `email` at the request DTO level (`CreateUsuarioRequest`). The `@Email` annotation additionally validates that the `email` field is a well-formed email address before the request reaches service logic.
+</Note>
+
+**API response shape (`GetUsuarioResponse`):**
+
+```json
+{
+  "id": 7,
+  "nombre": "María Torres",
+  "email": "maria.torres@example.com",
+  "password_hash": "$2a$10$...",
+  "rol": "usuario"
+}
+```
+
+---
+
+## Reserva
+
+`Reserva` is the transactional core of the system. It records that a specific `Usuario` has reserved a specific `Espacio` for a defined time window, and it tracks the reservation's current lifecycle state. It is stored in the `reservas` table.
+
+| Field           | Java Type   | DB Column         | Nullable | Description                                                                                          |
+|-----------------|-------------|-------------------|----------|------------------------------------------------------------------------------------------------------|
+| `id`            | `Integer`   | `id`              | No       | PK, auto-increment.                                                                                  |
+| `espacio`       | `Espacio`   | `espacio_id` (FK) | No       | ManyToOne reference to the reserved space.                                                           |
+| `usuario`       | `Usuario`   | `usuario_id` (FK) | No       | ManyToOne reference to the user who made the reservation.                                            |
+| `horaInicio`    | `Timestamp` | `hora_inicio`     | No       | The date and time the user's booking begins.                                                         |
+| `horaFinUsuario`| `Timestamp` | `hora_fin_usuario`| No       | The date and time the user's booking ends (their last usable minute).                                |
+| `horaFinTotal`  | `Timestamp` | `hora_fin_total`  | No       | `horaFinUsuario` + `espacio.minutos_limpieza`. The space is occupied and unavailable until this time.|
+| `estado`        | `String`    | `estado`          | Yes      | Lifecycle state of the reservation: `confirmada`, `pendiente`, or `cancelada`. Max 20 chars.         |
+| `version`       | `Integer`   | `version`         | Yes      | JPA optimistic-lock counter. Managed automatically by the persistence layer via `@Version`.          |
+
+### The `@Version` field and optimistic locking
+
+The `version` column is annotated with `@Version` in the JPA entity. JPA increments this integer automatically every time a `Reserva` row is updated. When two concurrent requests attempt to update the same reservation, the first one to commit will increment `version`. The second request — carrying the now-stale version number — will cause JPA to throw an `OptimisticLockException`, preventing a silent overwrite. See [Reservations](/concepts/reservations) for the full explanation.
+
+**API response shape (`CreateReservaResponse` / `UpdateReservaResponse`):**
+
+```json
+{
+  "id": 42,
+  "usuarioId": 7,
+  "espacioId": 3,
+  "horaInicio": "2025-07-15 09:00",
+  "horaFinUsuario": "2025-07-15 11:00",
+  "horaFinTotal": "2025-07-15 11:15",
+  "estado": "confirmada",
+  "version": 1
+}
+```
+
+---
+
+## Entity Relationship Diagram
+
+The three entities form a simple star schema centered on `Reserva`:
+
+```
+┌───────────────────┐          ┌───────────────────────────────────────┐
+│     espacios      │          │               reservas                │
+│───────────────────│          │───────────────────────────────────────│
+│ id (PK)           │◄────┐    │ id (PK)                               │
+│ nombre            │     └────│ espacio_id  (FK → espacios.id)        │
+│ tipo              │          │ usuario_id  (FK → usuarios.id)  ──┐   │
+│ capacidad         │          │ hora_inicio                       │   │
+│ minutos_limpieza  │          │ hora_fin_usuario                  │   │
+└───────────────────┘          │ hora_fin_total                    │   │
+                               │ estado                            │   │
+┌───────────────────┐          │ version                           │   │
+│     usuarios      │          └───────────────────────────────────┼───┘
+│───────────────────│                                              │
+│ id (PK)           │◄─────────────────────────────────────────────┘
+│ nombre            │
+│ email (UNIQUE)    │
+│ password_hash     │
+│ rol               │
+└───────────────────┘
+```
+
+- **`Reserva` → `Espacio`**: `@ManyToOne` — many reservations may reference the same space.
+- **`Reserva` → `Usuario`**: `@ManyToOne` — many reservations may belong to the same user.
+
+---
+
+## Timing Model
+
+Every `Reserva` carries three timestamps that together describe how long a space is occupied:
+
+<CardGroup cols={3}>
+  <Card title="horaInicio" icon="play">
+    When the user enters the space and their session begins.
+  </Card>
+  <Card title="horaFinUsuario" icon="stop">
+    When the user's booked time ends — the last minute they may occupy the space.
+  </Card>
+  <Card title="horaFinTotal" icon="broom">
+    `horaFinUsuario` + `espacio.minutos_limpieza`. The space is physically unavailable for new bookings until this time passes.
+  </Card>
+</CardGroup>
+
+The separation between `horaFinUsuario` and `horaFinTotal` means that scheduling logic must check against `horaFinTotal` — not `horaFinUsuario` — when deciding whether a new reservation overlaps an existing one. For example, if a space has `minutos_limpieza = 15` and a booking ends at `11:00`, the next booking cannot start until `11:15`.
+
+```
+Timeline:
+│── User in space ──────────────────────│── Cleaning ──│
+▲                                        ▲              ▲
+horaInicio                       horaFinUsuario   horaFinTotal
+(09:00)                              (11:00)        (11:15)
+```

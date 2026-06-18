@@ -1,0 +1,83 @@
+---
+title: "Usuarios API: User Registration and Management"
+sidebarTitle: "Overview"
+description: "The Usuarios endpoints manage user accounts for the coworking booking system. Create, retrieve, and delete users with role and email-based identity."
+---
+
+The **Usuarios** resource represents registered user accounts in the CoworkingBooking platform. Each user holds a display name, a unique email address, a role identifier, and a password value. Through this API you can list all users, look up a specific user by their integer ID, register a new user account, and permanently remove a user from the system.
+
+## Base path
+
+```
+/usuarios
+```
+
+## Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/usuarios/all` | Retrieve a list of all registered users |
+| `GET` | `/usuarios/{id}` | Fetch a single user by their integer ID |
+| `POST` | `/usuarios/create` | Register a new user account |
+| `DELETE` | `/usuarios/eliminar/{id}` | Permanently delete a user by ID |
+
+---
+
+## The Usuario object
+
+Every response that returns user data uses the following shape.
+
+<ResponseField name="id" type="integer">
+  Auto-generated primary key. Assigned by the database on creation and never changes.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  The user's full display name. Maximum 100 characters. Cannot be blank.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The user's email address. Maximum 150 characters. Must be a valid email format and **must be unique** across all users — duplicate emails are rejected with a `400` error.
+</ResponseField>
+
+<ResponseField name="password_hash" type="string">
+  The password value stored for this user. Maximum 255 characters. See the security warning below.
+</ResponseField>
+
+<ResponseField name="rol" type="string">
+  A free-form role identifier used to differentiate access levels. Common values are `"admin"` and `"usuario"`, but the field has no server-side enum constraint.
+</ResponseField>
+
+### Example Usuario object
+
+```json
+{
+  "id": 1,
+  "nombre": "María García",
+  "email": "maria@example.com",
+  "password_hash": "s3cr3tP@ssword",
+  "rol": "usuario"
+}
+```
+
+<Warning>
+  **`password_hash` is returned in plain text by every GET endpoint.** The server currently stores and returns this value exactly as it was supplied at creation time — no server-side hashing is applied. Before using this API in any production or internet-accessible environment, ensure passwords are hashed client-side (e.g., with bcrypt) before being sent, and review whether returning this field in GET responses is appropriate for your security model.
+</Warning>
+
+---
+
+## Explore the endpoints
+
+<CardGroup cols={2}>
+  <Card title="GET /all" icon="list" href="/api/usuarios/get-all">
+    Retrieve a list of all registered users in the system.
+  </Card>
+  <Card title="GET /{id}" icon="magnifying-glass" href="/api/usuarios/get-by-id">
+    Fetch a single user by their integer ID.
+  </Card>
+  <Card title="POST /create" icon="user-plus" href="/api/usuarios/create">
+    Register a new user account with name, email, password, and role.
+  </Card>
+  <Card title="DELETE /eliminar/{id}" icon="trash" href="/api/usuarios/delete">
+    Permanently delete a user account by ID.
+  </Card>
+</CardGroup>

@@ -1,47 +1,181 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get Started with CoworkingBooking API in 5 Minutes"
+sidebarTitle: "Quickstart"
+description: "Learn how to run the CoworkingBooking API locally, create a user, register a space, and make your first booking in five steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+This guide walks you through standing up the CoworkingBooking API on your local machine and making your first three API calls — creating a user, registering a coworking space, and booking that space — from scratch.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+<Note>
+  **Prerequisites** before you begin:
+  - **Java 21** (the project targets `java.version=21` in `pom.xml`)
+  - **Apache Maven** 3.9+ (or use the included `mvnw` wrapper — no separate install needed)
+  - **PostgreSQL** 14+ running and accessible (local instance or a hosted provider such as Supabase)
+</Note>
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+
+  <Step title="Clone the repository">
+    Download the project source and move into the backend directory:
 
     ```bash
-    npm install your-package
+    git clone https://github.com/devdavco/backend_1.git
+    cd backend_1
     ```
+
+    The Maven wrapper (`mvnw` / `mvnw.cmd`) is included, so no separate Maven installation is required.
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Set environment variables">
+    The API reads all database credentials from environment variables at startup. Create a file named `.env` (or export them in your shell) with the following values substituted for your environment:
 
     ```bash
-    your-cli init
+    DB_HOST=localhost
+    DB_PORT=5432
+    DB_NAME=coworking_db
+    DB_USER=coworking_usr
+    DB_PASSWORD=supersecretpassword
     ```
-  </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+    If you are using **Supabase**, find these values in your project's **Settings → Database** page. The `DB_PORT` for Supabase is typically `5432` (direct connection) or `6543` (connection pooler).
+
+    <Warning>
+      Never commit real credentials to version control. Add `.env` to your `.gitignore` before pushing.
+    </Warning>
+
+    To export the variables in a Unix shell session directly:
 
     ```bash
-    your-cli start
+    export DB_HOST=localhost
+    export DB_PORT=5432
+    export DB_NAME=coworking_db
+    export DB_USER=coworking_usr
+    export DB_PASSWORD=supersecretpassword
     ```
   </Step>
+
+  <Step title="Run the application">
+    Start the Spring Boot application using the Maven wrapper.
+
+    **Linux / macOS:**
+
+    ```bash
+    ./mvnw spring-boot:run
+    ```
+
+    **Windows:**
+
+    ```bash
+    mvnw.cmd spring-boot:run
+    ```
+
+    Maven will download dependencies on the first run. Once startup is complete you should see output similar to:
+
+    ```
+    Started CoworkingbookingApplication in 3.4 seconds (process running for 3.8)
+    ```
+
+    The API is now listening at `http://localhost:8080`. Verify with the built-in ping endpoint:
+
+    ```bash
+    curl http://localhost:8080/usuarios/ping
+    # → pong
+    ```
+  </Step>
+
+  <Step title="Create a user">
+    Register the first user by posting to `/usuarios/create`:
+
+    ```bash
+    curl -X POST http://localhost:8080/usuarios/create \
+      -H "Content-Type: application/json" \
+      -d '{
+        "nombre": "María García",
+        "email": "maria@example.com",
+        "password_hash": "secret",
+        "rol": "usuario"
+      }'
+    ```
+
+    **Sample response** (`201 Created`):
+
+    ```json
+    {
+      "id": 1,
+      "nombre": "María García",
+      "email": "maria@example.com",
+      "rol": "usuario"
+    }
+    ```
+
+    Note the returned `id` — you will reference it when creating a booking in Step 6.
+  </Step>
+
+  <Step title="Register a coworking space">
+    Add a meeting room to the system via `/espacios/create`:
+
+    ```bash
+    curl -X POST http://localhost:8080/espacios/create \
+      -H "Content-Type: application/json" \
+      -d '{
+        "nombre": "Sala A",
+        "tipo": "sala_reunion",
+        "capacidad": 10,
+        "minutos_limpieza": 15
+      }'
+    ```
+
+    **Sample response** (`201 Created`):
+
+    ```json
+    {
+      "id": 1,
+      "nombre": "Sala A",
+      "tipo": "sala_reunion",
+      "capacidad": 10,
+      "minutos_limpieza": 15
+    }
+    ```
+
+    `minutos_limpieza` is the buffer added after a session ends before the space becomes available again. The total end time of a booking (`horaFinTotal`) should equal `horaFinUsuario` plus this cleaning duration.
+  </Step>
+
+  <Step title="Book the space">
+    Create a reservation linking the user (`usuarioId: 1`) to the space (`espacioId: 1`):
+
+    ```bash
+    curl -X POST http://localhost:8080/reserva/create \
+      -H "Content-Type: application/json" \
+      -d '{
+        "usuarioId": 1,
+        "espacioId": 1,
+        "horaInicio": "2024-09-01 09:00",
+        "horaFinUsuario": "2024-09-01 10:00",
+        "horaFinTotal": "2024-09-01 10:15",
+        "estado": "confirmada"
+      }'
+    ```
+
+    **Sample response** (`201 Created`):
+
+    ```json
+    {
+      "id": 1,
+      "usuarioId": 1,
+      "espacioId": 1,
+      "horaInicio": "2024-09-01 09:00",
+      "horaFinUsuario": "2024-09-01 10:00",
+      "horaFinTotal": "2024-09-01 10:15",
+      "estado": "confirmada",
+      "version": 0
+    }
+    ```
+
+    The `version` field is managed by Hibernate for optimistic locking. The 15-minute gap between `horaFinUsuario` and `horaFinTotal` reflects the `minutos_limpieza` value set on the space.
+  </Step>
+
 </Steps>
 
 <Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
-
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
+  Open **`http://localhost:8080/swagger-ui.html`** in your browser for a fully interactive version of every endpoint. You can fill in request bodies, execute calls, and inspect responses without leaving the page — no `curl` required.
 </Tip>

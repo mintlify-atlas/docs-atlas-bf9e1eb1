@@ -1,0 +1,75 @@
+---
+title: "GET /espacios/all — List All Coworking Spaces"
+sidebarTitle: "GET /all"
+description: "Retrieve a list of all registered coworking spaces. Returns an array of Espacio objects with id, nombre, tipo, capacidad, and minutos_limpieza."
+---
+
+The `GET /espacios/all` endpoint returns every coworking space that has been registered in the system as an ordered JSON array. This is the primary way to populate a space selector in a booking UI, build an admin inventory view, or verify which spaces exist before creating a reservation. The endpoint requires no parameters and no authentication.
+
+## Request
+
+This endpoint accepts no query parameters, path parameters, or request body. No authentication headers are required.
+
+<Note>
+  The list is unfiltered and unordered — it reflects the natural insertion order returned by the underlying `JpaRepository.findAll()` call. If you need a specific ordering, sort the array client-side after receiving the response.
+</Note>
+
+### Example request
+
+```bash
+curl http://localhost:8080/espacios/all
+```
+
+## Response
+
+### 200 OK
+
+Returns a JSON array of Espacio objects. If no spaces have been created yet, the array will be empty (`[]`).
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "Sala de Reuniones A",
+    "tipo": "sala_reunion",
+    "capacidad": 10,
+    "minutos_limpieza": 15
+  },
+  {
+    "id": 2,
+    "nombre": "Auditorio Principal",
+    "tipo": "auditorio",
+    "capacidad": 80,
+    "minutos_limpieza": 30
+  },
+  {
+    "id": 3,
+    "nombre": "Oficina Privada 1",
+    "tipo": "oficina_privada",
+    "capacidad": 4,
+    "minutos_limpieza": 10
+  }
+]
+```
+
+### Response fields (per array item)
+
+<ResponseField name="id" type="integer">
+  Auto-generated unique identifier for the coworking space.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  Human-readable name of the space. Up to 50 characters.
+</ResponseField>
+
+<ResponseField name="tipo" type="string">
+  Functional category of the space (e.g., `sala_reunion`, `auditorio`, `oficina_privada`). Up to 30 characters.
+</ResponseField>
+
+<ResponseField name="capacidad" type="integer">
+  Maximum occupancy of the space expressed as a headcount.
+</ResponseField>
+
+<ResponseField name="minutos_limpieza" type="integer">
+  Number of minutes automatically reserved after each booking ends for cleaning, before the next booking can start.
+</ResponseField>

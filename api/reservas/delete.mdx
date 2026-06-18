@@ -1,0 +1,31 @@
+---
+title: "DELETE /reserva/eliminar/{id} — Cancel and Remove a Reservation"
+sidebarTitle: "DELETE /eliminar"
+description: "Delete a reservation by its integer ID. Returns a plain text success message. Throws a 500 error if the ID does not exist."
+---
+
+The `DELETE /reserva/eliminar/{id}` endpoint permanently removes a reservation record from the database. The service first fetches the record to confirm it exists — using `orElseThrow` — and then calls `delete` on the repository. On success the response body is the plain-text string `"Reserva eliminada exitosamente"` with an HTTP `200 OK` status. This operation is irreversible; deleted reservations cannot be recovered through the API.
+
+## Path parameters
+
+<ParamField path="id" type="integer" required>
+  The integer primary key of the reservation to delete. Must correspond to an existing record in the `reservas` table.
+</ParamField>
+
+## Request
+
+```bash
+curl -X DELETE http://localhost:8080/reserva/eliminar/1
+```
+
+## Response
+
+Returns `200 OK` with a plain-text confirmation message.
+
+```
+Reserva eliminada exitosamente
+```
+
+<Warning>
+  If no reservation with the supplied `id` is found, the service throws a `RuntimeException` ("Reserva no encontrada con ID: {id}"), which Spring Boot maps to an HTTP `500 Internal Server Error`. There is no `404 Not Found` response for this endpoint. Verify the reservation exists via `GET /reserva/{id}` or `GET /reserva/all` before attempting to delete it.
+</Warning>

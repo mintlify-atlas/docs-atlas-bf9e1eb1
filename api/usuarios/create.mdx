@@ -1,0 +1,118 @@
+---
+title: "POST /usuarios/create — Register a New User"
+sidebarTitle: "POST /create"
+description: "Register a new user by providing nombre, email, password_hash, and rol. Email must be unique; a duplicate triggers a 400 error with type email-alredy-exist."
+---
+
+The `POST /usuarios/create` endpoint registers a new user account in the CoworkingBooking system. You must supply at minimum a `nombre` and a valid, unique `email`. Optionally include a `password_hash` value and a `rol` to control the user's access level. If the provided email is already associated with an existing account, the request is rejected with a `400 Bad Request` response before any data is written.
+
+## Request body
+
+<ParamField body="nombre" type="string" required>
+  The user's full display name. Validated with `@NotBlank` — cannot be `null`, empty, or whitespace only. Maximum 100 characters as enforced by the database column.
+</ParamField>
+
+<ParamField body="email" type="string" required>
+  The user's email address. Validated with `@NotBlank` and `@Email` — must be non-blank and in a valid email format (e.g., `user@domain.com`). **Must be unique** across all existing users; a duplicate email returns a `400` error (see [Error responses](#error-responses) below).
+</ParamField>
+
+<ParamField body="password_hash" type="string">
+  The password value to store for this user. The server stores and returns this field exactly as provided — **no server-side hashing is performed**. Callers are responsible for hashing passwords before sending them to this endpoint. Maximum 255 characters.
+</ParamField>
+
+<ParamField body="rol" type="string">
+  A role identifier for the user. The server applies no enum constraint on this field. Common values used in the platform are `"admin"` and `"usuario"`. Defaults to whatever the underlying database column default is if omitted.
+</ParamField>
+
+---
+
+## Validation rules
+
+| Field | Rules |
+|-------|-------|
+| `nombre` | Required. Cannot be blank. |
+| `email` | Required. Must be a valid email format. Must not already exist in the database. |
+| `password_hash` | Optional. Stored as-is. |
+| `rol` | Optional. Free-form string — no enum enforcement. |
+
+---
+
+## Request
+
+```bash
+curl -X POST http://localhost:8080/usuarios/create \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "María García",
+    "email": "maria@example.com",
+    "password_hash": "s3cr3tP@ssword",
+    "rol": "usuario"
+  }'
+```
+
+---
+
+## Response
+
+### 201 Created
+
+On success, returns a `201 Created` status with the newly created Usuario object in the response body.
+
+<ResponseField name="id" type="integer">
+  The auto-generated primary key assigned to the new user by the database.
+</ResponseField>
+
+<ResponseField name="nombre" type="string">
+  The user's full display name as stored.
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The user's email address as stored.
+</ResponseField>
+
+<ResponseField name="password_hash" type="string">
+  The password value exactly as it was supplied in the request.
+</ResponseField>
+
+<ResponseField name="rol" type="string">
+  The role identifier as stored.
+</ResponseField>
+
+```json
+{
+  "id": 3,
+  "nombre": "María García",
+  "email": "maria@example.com",
+  "password_hash": "s3cr3tP@ssword",
+  "rol": "usuario"
+}
+```
+
+---
+
+## Error responses
+
+### 400 Bad Request — duplicate email
+
+If the supplied `email` already belongs to an existing user, `UsuarioAlreadyExistsException` is thrown and the `RestExceptionHandler` converts it into the following response:
+
+```json
+{
+  "type": "email-alredy-exist",
+  "message": "El usuario con el correo maria@example.com ya existe"
+}
+```
+
+<Note>
+  The `type` value is `"email-alredy-exist"` (note the intentional spelling as found in the source). Use this exact string when pattern-matching error types client-side.
+</Note>
+
+### 400 Bad Request — validation failure
+
+If `nombre` is blank or `email` is blank or malformed, Spring's bean validation returns a `400` error with details about which fields failed.
+
+---
+
+<Warning>
+  **`password_hash` is stored exactly as provided and returned in GET responses.** The server performs no hashing. Always hash passwords client-side using a strong algorithm (e.g., bcrypt, Argon2) before sending them to this endpoint to avoid storing plaintext credentials.
+</Warning>

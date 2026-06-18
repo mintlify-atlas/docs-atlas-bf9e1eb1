@@ -1,0 +1,148 @@
+---
+title: "Error Handling and HTTP Status Codes in CoworkingBooking"
+sidebarTitle: "Error Handling"
+description: "Understand how CoworkingBooking surfaces errors via HTTP status codes and structured JSON error bodies, including validation and business rule failures."
+---
+
+CoworkingBooking centralises all exception-to-HTTP-response mapping in a single `@RestControllerAdvice` class (`RestExceptionHandler`). When a handled exception is thrown anywhere in the request pipeline, the advice intercepts it and returns a structured JSON body with a consistent shape. Unhandled exceptions fall through to Spring Boot's default error mechanism and return a `500 Internal Server Error`. Understanding both paths — handled and unhandled — is essential for writing robust client code.
+
+---
+
+## Error Response Format
+
+All responses produced by `RestExceptionHandler` share the same JSON structure, defined by the `Error` record:
+
+```java
+public record Error(String type, String message) {}
+```
+
+| Field     | Type     | Description                                                                   |
+|-----------|----------|-------------------------------------------------------------------------------|
+| `type`    | `String` | A short machine-readable error code that identifies the category of the error.|
+| `message` | `String` | A human-readable description with context (e.g., the offending email address).|
+
+**Example error response body:**
+
+```json
+{
+  "type": "email-alredy-exist",
+  "message": "El usuario con el correo maria@example.com ya existe"
+}
+```
+
+<Note>
+  The error code `email-alredy-exist` is the literal string used in the source code (note the single `r` in "alredy"). Match this exact spelling when checking the `type` field in client logic.
+</Note>
+
+---
+
+## Known Error Codes
+
+<CardGroup cols={1}>
+  <Card title="email-alredy-exist — 400 Bad Request" icon="circle-xmark">
+    **Exception class:** `UsuarioAlreadyExistsException`
+
+    **Trigger:** A `POST /usuario/save` request is made with an email address that is already registered in the `usuarios` table.
+
+    **Message format:** `"El usuario con el correo {email} ya existe"`
+
+    ```json
+    {
+      "type": "email-alredy-exist",
+      "message": "El usuario con el correo maria@example.com ya existe"
+    }
+    ```
+  </Card>
+</CardGroup>
+
+### Validation errors (400 Bad Request)
+
+The `CreateUsuarioRequest` DTO carries Bean Validation annotations. When a request body fails these constraints, Spring returns a `400 Bad Request` before the request even reaches service logic.
+
+| Field    | Annotation                       | Message (Spanish)              |
+|----------|----------------------------------|--------------------------------|
+| `nombre` | `@NotBlank`                      | `"El nombre es obligatorio"`   |
+| `email`  | `@NotBlank`                      | `"El correo es obligatorio"`   |
+| `email`  | `@Email`                         | `"El correo no es válido"`     |
+
+### Runtime / resource-not-found errors (500 Internal Server Error)
+
+When a `Reserva`, `Espacio`, or `Usuario` is looked up by ID and does not exist, the service layer throws a plain `RuntimeException`:
+
+```java
+throw new RuntimeException("Reserva no encontrada con ID: " + id);
+```
+
+Because `RuntimeException` is not mapped by `RestExceptionHandler`, Spring Boot's default handler returns `500 Internal Server Error` with a generic error body rather than a `404 Not Found`.
+
+<Note>
+  Returning `500` for a missing resource is a known practical limitation of the current implementation. In a REST-compliant design these cases would be mapped to `404 Not Found` via a dedicated `ResourceNotFoundException` handler in `RestExceptionHandler`. For now, clients should treat a `500` response containing "no encontrada" in the message as a not-found condition.
+</Note>
+
+---
+
+## HTTP Status Codes
+
+| Status Code              | Scenario                                                                        |
+|--------------------------|---------------------------------------------------------------------------------|
+| `201 Created`            | Successful `POST` to any `/save` endpoint (e.g., `POST /reserva/save`).        |
+| `200 OK`                 | Successful `GET`, `DELETE`, or `PUT` request.                                   |
+| `400 Bad Request`        | Bean Validation failure (`@NotBlank`, `@Email`) or duplicate-email condition.  |
+| `500 Internal Server Error` | Resource not found (Reserva, Espacio, or Usuario with the given ID does not exist), or any other unhandled exception. |
+
+<Warning>
+  Do not assume that a `500` response always means a server-side bug. In the current API, a `500` is also the response code for "resource not found" scenarios. Always inspect the response body's `message` field to distinguish a missing resource from a genuine server fault.
+</Warning>
+
+---
+
+## Client Error Handling
+
+The following pattern shows how to consume CoworkingBooking responses defensively — checking the HTTP status, parsing the structured error body when present, and distinguishing between handled errors (with a `type` code) and raw Spring Boot errors.
+
+```javascript
+async function updateReservation(id, estado) {
+  const response = await fetch(`/reserva/update/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id, estado }),
+  });
+
+  if (response.ok) {
+    // 200 OK — reservation updated successfully
+    return await response.json();
+  }
+
+  // Parse the error body (works for both handled and unhandled errors)
+  const errorBody = await response.json().catch(() => null);
+
+  if (response.status === 400 && errorBody?.type === "email-alredy-exist") {
+    throw new Error(`Duplicate email: ${errorBody.message}`);
+  }
+
+  if (response.status === 500) {
+    const msg = errorBody?.message ?? "Unknown server error";
+    if (msg.includes("no encontrada")) {
+      // Treat as a not-found condition despite the 500 status
+      throw new Error(`Resource not found: ${msg}`);
+    }
+    throw new Error(`Server error: ${msg}`);
+  }
+
+  throw new Error(`Unexpected status ${response.status}: ${JSON.stringify(errorBody)}`);
+}
+```
+
+<Tip>
+  When handling errors from reservation creation, always check `response.status` first — a `400` with `type: "email-alredy-exist"` is a recoverable user-input error, while a `500` containing "no encontrada" indicates that the `espacioId` or `usuarioId` you passed does not exist in the database.
+</Tip>
+
+### Error body reference
+
+<ResponseField name="type" type="string">
+  Machine-readable error code. Currently defined value: `"email-alredy-exist"`. Falls back to Spring Boot's default `"error"` key for unhandled exceptions.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable description of the error, often including the offending value (e.g., the email address or the resource ID that was not found).
+</ResponseField>
